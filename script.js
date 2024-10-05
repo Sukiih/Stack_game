@@ -1,5 +1,6 @@
 const canvas = document.querySelector('canvas');
 const context = canvas.getContext('2d');
+const score = document.getElementById('score');
 
 const MODES = {
     FALL: 'fall',
@@ -19,6 +20,7 @@ const INITIAL_X_SPEED = 2; // velocidad lateral de la caja
 //STATE
 
 let boxes = [];
+let debris = {x: 0, y: 0, width: 0};
 let scrollCounter, cameraY, current, mode, xSpeed, ySpeed;
 
 
@@ -51,6 +53,7 @@ function initializeGameState() {
     }];
 
     //caja actual
+    debris = {x: 0, y: 0, width: 0};
     current = 1;
     mode = MODES.BOUNCE
     xSpeed = INITIAL_X_SPEED
@@ -73,6 +76,7 @@ function draw() {
     if (mode === MODES.GAMEOVER) return
     drawBackground() 
     drawBoxes()
+    drawDebris()
 
 
     //movimiento
@@ -82,6 +86,8 @@ function draw() {
         updateFallMode()
     }
     
+
+    debris.y -= ySpeed
     //camara
     updateCamera()
 
@@ -94,11 +100,21 @@ function drawBackground() {
     context.fillRect(0, 0, canvas.width, canvas.height);
 }
 
+function drawDebris() {
+    const { x, y, width, color } = debris
+    const newY = INITIAL_BOX_Y - y + cameraY
+
+    context.fillStyle = color
+    context.fillRect(x, newY, width, BOX_HEIGHT)
+
+    
+}
+
 //dibujar las cajas
 function drawBoxes() {
     boxes.forEach((box) => {
         const { x, y, width, color } = box
-        const newY = INITIAL_BOX_Y - y + cameraY
+        const newY = INITIAL_BOX_Y - y + cameraY   
 
         context.fillStyle = color
         context.fillRect(x, newY, width, BOX_HEIGHT)
@@ -113,6 +129,22 @@ function createNewBox() {
         width: boxes[current - 1].width,
         color: createStepColor(current)
     })
+}
+
+function createNewDebris(difference){
+    const currentBox = boxes[current]
+    const previousBox = boxes[current - 1]
+
+    const debrisX = currentBox.x > previousBox.x
+    ? currentBox.x + currentBox.width
+    : currentBox.x
+
+    debris = {
+        x: debrisX,
+        y: currentBox.y,
+        width: difference,
+        color: currentBox.color
+    }
 }
 
 
@@ -140,6 +172,20 @@ function updateFallMode() {
         }
 }
 
+//Visibilidad GameOver
+    function gameOver() {
+        mode = MODES.GAMEOVER
+
+        context.fillStyle = 'rgba(255, 0, 0, 0.3)'
+        context.fillRect(0, 0, canvas.width, canvas.height)
+
+        context.font = '40px Impact'
+        context.fillStyle = 'white'
+        context.textBaseline = 'middle'
+        context.textAlign = 'center'
+        context.fillText('Game Over', canvas.width / 2, canvas.height / 2)
+    }
+
     function handleBoxLanding() {
         const currentBox = boxes[current]
         const previousBox = boxes[current - 1]
@@ -147,17 +193,21 @@ function updateFallMode() {
         const difference = currentBox.x - previousBox.x
 
         if (Math.abs(difference) >= currentBox.width) {
-            mode = MODES.GAMEOVER
+            gameOver()
             return
         }
 
         adjustCurrentBox(difference)
+
+        createNewDebris(difference)
 
         //incrementamos la velocidad. Si xspeed es mayor a 0 aumentamos o decrementamos en 1
         xSpeed += xSpeed > 0 ? 1 : -1
         current++
         scrollCounter = BOX_HEIGHT
         mode = MODES.BOUNCE
+
+        score.innerHTML = `Score: ${current - 1}`
 
         createNewBox()
     }
@@ -188,10 +238,16 @@ function updateFallMode() {
     document.addEventListener('keydown', (event) => {
         if(event.key === ' ' && mode === MODES.BOUNCE) {
             mode = MODES.FALL
+        } else if(event.key === ' ' && mode === MODES.GAMEOVER) {
+            restart()
         }
     })
 
-
-
-console.log('hola')
+    canvas.onpointerdown = () => {
+        if(mode === MODES.GAMEOVER) {
+            restart()
+        } else if(mode === MODES.BOUNCE) {
+            mode = MODES.FALL
+    }
+}
 restart();
